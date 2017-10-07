@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import android.app.Activity;
 import android.content.ContentValues;
@@ -27,9 +30,14 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
+
 
 public class MainActivity extends Activity implements OnClickListener,
         SurfaceHolder.Callback {
+
+    private static final int PIXEL_WIDTH = 28;
+
     SurfaceView cameraView;
     SurfaceHolder surfaceHolder;
     Camera camera;
@@ -40,6 +48,8 @@ public class MainActivity extends Activity implements OnClickListener,
     boolean timelapseRunning = false;
     int currentTime = 0;
     final int SECONDS_BETWEEN_PHOTOS = 1;
+
+    private List<Classifier> mClassifiers = new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -54,6 +64,7 @@ public class MainActivity extends Activity implements OnClickListener,
         startStopButton = (Button) findViewById(R.id.CountDownButton);
         startStopButton.setOnClickListener(this);
         timerUpdateHandler = new Handler();
+        loadModel();
     }
 
     public void onClick(View v) {
@@ -136,6 +147,25 @@ public class MainActivity extends Activity implements OnClickListener,
                 imageFileOS.flush();
                 imageFileOS.close();
 
+                int w = resized.getWidth();
+                int h = resized.getHeight();
+                int pixels[] = new int[w*h];
+                resized.getPixels(pixels, 0, 0, w, 0, w, h);
+
+                String text = "";
+                for (Classifier classifier : mClassifiers) {
+                    //perform classification on the image
+                    final Classification res = classifier.recognize(pixels);
+                    //if it can't classify, output a question mark
+                    if (res.getLabel() == null) {
+                        text += classifier.name() + ": ?\n";
+                    } else {
+                        //else output its name
+                        text += String.format("%s: %s, %f\n", classifier.name(), res.getLabel(),
+                                res.getConf());
+                    }
+                }
+
                 Toast t = Toast.makeText(MainActivity.this, "Saved JPEG!", Toast.LENGTH_SHORT);
                 t.show();
             } catch (Exception e) {
@@ -153,6 +183,24 @@ public class MainActivity extends Activity implements OnClickListener,
         }
 
     };
+
+    private void loadModel() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mClassifiers.add(TensorFlowClassifier.create(
+                            getAssets(),
+                            "Keras",
+                            "opt_mnist_convnet-keras.pb", "labels.txt", PIXEL_WIDTH,
+                            "conv2d_1_input", "dense_2/Softmax", false)
+                    );
+                } catch (final Exception e) {
+                    throw new RuntimeException("Error initializing classifiers!", e);
+                }
+            }
+        }).start();
+    }
 
 
 }
