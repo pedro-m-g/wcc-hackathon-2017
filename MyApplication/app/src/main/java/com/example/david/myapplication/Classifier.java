@@ -1,5 +1,7 @@
 package com.example.david.myapplication;
 
+import android.graphics.Bitmap;
+
 /**
  * Created by pedro on 10/7/17.
  */

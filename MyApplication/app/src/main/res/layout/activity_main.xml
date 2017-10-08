@@ -8,32 +8,58 @@
     <FrameLayout
         android:id="@+id/FrameLayout01"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content">
 
         <SurfaceView
             android:id="@+id/CameraView"
             android:layout_width="fill_parent"
-            android:layout_height="fill_parent"></SurfaceView>
+            android:layout_height="346dp"></SurfaceView>
+
+    </FrameLayout>
+
+    <Button
+        android:id="@+id/TakePhotoButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tomar foto" />
+
+    <TextView
+        android:id="@+id/predictionText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
         <LinearLayout
-            android:orientation="vertical"
-            android:id="@+id/LinearLayout01"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:id="@+id/CountDownTextView"
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical|center_horizontal|center"
-                android:text="10"
-                android:textSize="100dip"></TextView>
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
 
             <Button
-                android:id="@+id/CountDownButton"
+                android:id="@+id/rejectButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Start Timer"></Button>
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="Rechazar" />
+
+            <Button
+                android:id="@+id/acceptButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:enabled="false"
+                android:text="Aceptar" />
         </LinearLayout>
-    </FrameLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/output"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="" />
+
 </LinearLayout>

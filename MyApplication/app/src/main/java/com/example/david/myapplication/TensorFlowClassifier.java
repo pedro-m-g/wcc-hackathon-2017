@@ -27,7 +27,7 @@ public class TensorFlowClassifier implements Classifier {
 
     // Only returns if at least this confidence
     //must be a classification percetnage greater than this
-    private static final float THRESHOLD = 0.1f;
+    private static final float THRESHOLD = 0.7f;
 
     private TensorFlowInferenceInterface tfHelper;
 
@@ -43,24 +43,19 @@ public class TensorFlowClassifier implements Classifier {
 
     //given a saved drawn model, lets read all the classification labels that are
     //stored and write them to our in memory labels list
-    private static List<String> readLabels(AssetManager am, String fileName) throws IOException {
-        BufferedReader br = new BufferedReader(new InputStreamReader(am.open(fileName)));
-
-        String line;
-        List<String> labels = new ArrayList<>();
-        while ((line = br.readLine()) != null) {
-            labels.add(line);
+    private static List<String> readLabels() throws IOException {
+        List<String> letters = new ArrayList<>();
+        for (char i = 97; i <= 117; i++) {
+            letters.add(Character.toString(i));
         }
-
-        br.close();
-        return labels;
+        return letters;
     }
 
     //given a model, its label file, and its metadata
     //fill out a classifier object with all the necessary
     //metadata including output prediction
     public static TensorFlowClassifier create(AssetManager assetManager, String name,
-                                              String modelPath, String labelFile, int inputSize, String inputName, String outputName,
+                                              String modelPath, int inputSize, String inputName, String outputName,
                                               boolean feedKeepProb) throws IOException {
         //intialize a classifier
         TensorFlowClassifier c = new TensorFlowClassifier();
@@ -72,7 +67,7 @@ public class TensorFlowClassifier implements Classifier {
         c.outputName = outputName;
 
         //read labels for label file
-        c.labels = readLabels(assetManager, labelFile);
+        c.labels = readLabels();
 
         //set its model path and where the raw asset files are
         c.tfHelper = new TensorFlowInferenceInterface(assetManager, modelPath);
@@ -103,7 +98,7 @@ public class TensorFlowClassifier implements Classifier {
         //using the interface
         //give it the input name, raw pixels from the drawing,
         //input size
-        tfHelper.feed(inputName, pixels, 1, inputSize, inputSize, 1);
+        tfHelper.feed(inputName, pixels, 1, inputSize, inputSize, 3);
 
         //probabilities
         if (feedKeepProb) {
@@ -137,7 +132,7 @@ public class TensorFlowClassifier implements Classifier {
         //using the interface
         //give it the input name, raw pixels from the drawing,
         //input size
-        tfHelper.feed(inputName, pixels, 1, inputSize, inputSize, 1);
+        tfHelper.feed(inputName, pixels, 1, inputSize, inputSize, 3);
 
         //probabilities
         if (feedKeepProb) {

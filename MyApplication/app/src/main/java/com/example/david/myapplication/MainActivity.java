@@ -36,20 +36,19 @@ import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 public class MainActivity extends Activity implements OnClickListener,
         SurfaceHolder.Callback {
 
-    private static final int PIXEL_WIDTH = 28;
+    private static final int PIXEL_WIDTH = 64;
+    private Bitmap croppedBitmap = null;
 
     SurfaceView cameraView;
     SurfaceHolder surfaceHolder;
     Camera camera;
 
-    Button startStopButton;
-    TextView countdownTextView;
-    Handler timerUpdateHandler;
-    boolean timelapseRunning = false;
-    int currentTime = 0;
-    final int SECONDS_BETWEEN_PHOTOS = 1;
-
+    Button rejectButton, acceptButton;
+    Button takePhotoButton;
+    TextView output;
     private List<Classifier> mClassifiers = new ArrayList<>();
+    private String prediction = "";
+    private TextView predictionText;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -60,38 +59,40 @@ public class MainActivity extends Activity implements OnClickListener,
         surfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         surfaceHolder.addCallback(this);
 
-        countdownTextView = (TextView) findViewById(R.id.CountDownTextView);
-        startStopButton = (Button) findViewById(R.id.CountDownButton);
-        startStopButton.setOnClickListener(this);
-        timerUpdateHandler = new Handler();
+        output = (TextView) findViewById(R.id.output);
+        predictionText = (TextView) findViewById(R.id.predictionText);
+        takePhotoButton = (Button) findViewById(R.id.TakePhotoButton);
+        takePhotoButton.setOnClickListener(this);
+
+        rejectButton = (Button) findViewById(R.id.rejectButton);
+        rejectButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                prediction = "";
+                predictionText.setText("");
+                acceptButton.setEnabled(false);
+                rejectButton.setEnabled(false);
+            }
+        });
+
+        acceptButton = (Button) findViewById(R.id.acceptButton);
+        acceptButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                output.setText(output.getText() + prediction);
+                prediction = "";
+                predictionText.setText("");
+                acceptButton.setEnabled(false);
+                rejectButton.setEnabled(false);
+            }
+        });
+
         loadModel();
     }
 
     public void onClick(View v) {
-        if (!timelapseRunning) {
-            startStopButton.setText("Stop");
-            timelapseRunning = true;
-            timerUpdateHandler.post(timerUpdateTask);
-        } else {
-            startStopButton.setText("Start");
-            timelapseRunning = false;
-            timerUpdateHandler.removeCallbacks(timerUpdateTask);
-        }
+        camera.takePicture(shutterCallback, rawCallback, jpegCallback);
     }
-
-    private Runnable timerUpdateTask = new Runnable() {
-        public void run() {
-            if (currentTime < SECONDS_BETWEEN_PHOTOS) {
-                currentTime++;
-            } else {
-                camera.takePicture(shutterCallback, rawCallback, jpegCallback);
-                currentTime = 0;
-            }
-
-            timerUpdateHandler.postDelayed(timerUpdateTask, 1000);
-            countdownTextView.setText("" + currentTime);
-        }
-    };
 
     public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
         camera.startPreview();
@@ -134,54 +135,42 @@ public class MainActivity extends Activity implements OnClickListener,
             Uri imageFileUri = getContentResolver().insert(
                     Media.EXTERNAL_CONTENT_URI, new ContentValues());
             try {
-                int newWidth = 300, newHeight=300;
+                int newWidth = 64, newHeight=64;
                 Bitmap yourBitmap = BitmapFactory.decodeByteArray(data,0,data.length);
                 Bitmap resized = Bitmap.createScaledBitmap(yourBitmap, newWidth, newHeight, true);
-
-                String imagen64 = getEncoded64ImageStringFromBitmap(resized);
-                Log.i(imagen64,"<----------------"+imagen64);
-
-                OutputStream imageFileOS = getContentResolver().openOutputStream(
-                        imageFileUri);
-                imageFileOS.write(data);
-                imageFileOS.flush();
-                imageFileOS.close();
 
                 int w = resized.getWidth();
                 int h = resized.getHeight();
                 int pixels[] = new int[w*h];
-                resized.getPixels(pixels, 0, 0, w, 0, w, h);
+                resized.getPixels(pixels, 0, w, 0, 0, w, h);
 
-                String text = "";
-                for (Classifier classifier : mClassifiers) {
-                    //perform classification on the image
-                    final Classification res = classifier.recognize(pixels);
-                    //if it can't classify, output a question mark
-                    if (res.getLabel() == null) {
-                        text += classifier.name() + ": ?\n";
-                    } else {
-                        //else output its name
-                        text += String.format("%s: %s, %f\n", classifier.name(), res.getLabel(),
-                                res.getConf());
-                    }
+                float floatPixels[] = new float[pixels.length];
+                for (int i = 0; i < pixels.length; i++) {
+                    floatPixels[i] = (float) pixels[i] / 255.0f;
                 }
 
-                Toast t = Toast.makeText(MainActivity.this, "Saved JPEG!", Toast.LENGTH_SHORT);
-                t.show();
+                croppedBitmap = Bitmap.createBitmap(newWidth, newHeight, Bitmap.Config.ARGB_8888);
+
+                prediction = "";
+                for (Classifier classifier : mClassifiers) {
+                    final Classification res = classifier.recognize(floatPixels);
+                    prediction = res.getLabel();
+                    if (prediction != null && !prediction.isEmpty()) {
+                        predictionText.setText(prediction);
+                        acceptButton.setEnabled(true);
+                        rejectButton.setEnabled(true);
+                    } else {
+                        Toast t = Toast.makeText(MainActivity.this, "No se pudo interpretar la señal. Intenta de nuevo", Toast.LENGTH_SHORT);
+                        t.show();
+                    }
+                }
             } catch (Exception e) {
+                Log.e("ERROR", e.getMessage());
                 Toast t = Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT);
                 t.show();
             }
             camera.startPreview();
         }
-        public String getEncoded64ImageStringFromBitmap(Bitmap bitmap) {
-            ByteArrayOutputStream stream = new ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
-            byte[] byteFormat = stream.toByteArray();
-            String imgString = Base64.encodeToString(byteFormat, Base64.NO_WRAP);
-            return imgString;
-        }
-
     };
 
     private void loadModel() {
@@ -192,7 +181,7 @@ public class MainActivity extends Activity implements OnClickListener,
                     mClassifiers.add(TensorFlowClassifier.create(
                             getAssets(),
                             "Keras",
-                            "opt_mnist_convnet-keras.pb", "labels.txt", PIXEL_WIDTH,
+                            "opt_mnist_convnet-keras.pb", PIXEL_WIDTH,
                             "conv2d_1_input", "dense_2/Softmax", false)
                     );
                 } catch (final Exception e) {
